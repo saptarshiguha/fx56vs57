@@ -175,7 +175,7 @@ mb <- s2[,{
     plot <- ks_plot(x$responder=='r',x$ph)
     list(m=list(modelSimp),r=mean(responder=='r'), x=list(x2), prec=prec,sens=sens,con=concord$Concordance)
 },by=branch]
-
+ 
 ```
 
 ## see counry=India response, crashes dont affect response, it's all usage hors
