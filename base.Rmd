@@ -1,0 +1,59 @@
+---
+title: HeartBeat!!
+author: Saptarshi Guha <joy@mozilla.com>
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+ html_document:
+    mathjax: default
+    self_contained: true
+    theme: readable
+    highlight: haddock
+    number_sections: true
+    code_folding: show
+    toc: true
+    toc_depth: 3
+    toc_float: true
+
+---
+
+```{r child = '/home/sguha/mz/template.Rmd'}
+```
+
+
+
+<div class="embed-responsive embed-responsive-16by9 col-xs-12 text-center">
+<iframe width="560" height="315" src="https://www.youtube.com/embed/oSkulWT7V4M"
+frameborder="0" allowfullscreen></iframe>
+</div>
+
+<br/></br>
+
+# Sentiment 57 study {.tabset}
+Details about how the questions are asked, how answers encoded can be found in a
+this [slack conversation](https://mozilla.slack.com/messages/G7SPQT3EF). If you
+can't view it ask Saptarshi Guha for permissions to view. Other documents of
+interest :
+
+- the [Github rep](https://github.com/gregglind/57-perception-shield-study/blob/master/TELEMETRY.md)
+- the [Google
+  Doc](https://docs.google.com/document/d/1iDH4-_mv4Pr6e_0Wja6fEca08KVfddT-6nBmXuUt9BM/edit)
+  
+This particular sentiment survey is always running, i.e. a different bucket gets
+asked say every time period 'T'. Hence in the following query, place a filter on
+`submission` otherwise you will get a ton of data.
+
+The CSV corresponding to the survey (and covariates) is located on S3 at
+`s3://mozilla-metrics/user/sguha/tmp/sentiment56.csv`. Moreover, some profiles
+in the surveys could not be located in `main-summary` or `clients_daily`. The
+csv file for them is at `s3://mozilla-metrics/user/sguha/tmp/sentiment56_missing.csv`.
+
+
+## Getting the Data {-}
+```{r child = '/home/sguha/mz/sentiment57/pythondata.Rmd'}
+```
+
+## Analysis {-}
+```{r child = '/home/sguha/mz/sentiment57/analysis.Rmd'}
+```
+
+

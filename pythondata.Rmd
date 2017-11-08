@@ -1,0 +1,264 @@
+
+```{python eval=FALSE, code_folding='hide'}
+import sys
+import datetime
+import random
+import subprocess
+import mozillametricstools.common.functions as mozfun
+
+from pyspark.sql import SparkSession
+spark = SparkSession.builder.getOrCreate()
+ts = spark.read.option("mergeSchema", "true").\
+     parquet("s3://net-mozaws-prod-us-west-2-pipeline-data/telemetry-shield-study-addon-parquet/v1/")
+ts.createOrReplaceTempView('ts')
+
+d0 = spark.sql("""
+select * 
+FROM ts
+WHERE payload.testing = FALSE
+  AND payload.study_name = '57-perception-shield-study'
+  AND submission  >= '20171017'
+  and submission <='20171113'
+""")
+d0.createOrReplaceTempView("d0")
+
+
+d=spark.sql("""
+SELECT 
+client_id,
+submission as date,
+payload.branch as branch,
+payload.data.attributes.promptType as promptype,
+coalesce(payload.data.attributes.message,'NA') as question,
+payload.data.attributes.event as event,
+coalesce(payload.data.attributes.score,-2) as response
+from d0
+order by client_id
+""")
+d.createOrReplaceTempView("d")
+```
+
+Remove profiles with 2+ responses. 
+
+```{python eval=FALSE}
+spark.sql("""
+with a as (select client_id, count(*) as n from d group by 1)
+select n, count(distinct(client_id)) as PingsperClient
+from a group by n order by n""").toPandas()
+d2 = spark.sql("""
+with a as (select client_id, count(*) as n from d group by 1)
+select d.* from d  join a on a.client_id = d.client_id where a.n <=2
+order by client_id
+""")
+d2.createOrReplaceTempView("d2")
+d2.cache()
+d30 = spark.sql("""
+select branch,question,count(*) as n  from d2 where event='answered' group by 1,2 order by 1,2
+""")
+d30.createOrReplaceTempView("d30")
+
+```
+And now convert the data set into one row per client tagged as a responder or
+non responder.
+
+```{python eval=FALSE}
+d3 = spark.sql("""
+with
+answered as (
+select 
+client_id, date, branch, response, 'r' as responder from d2
+where event = 'answered'
+), 
+a0 as ( select client_id from answered ),
+a1 as ( select d2.client_id from d2 except select client_id from a0),
+nonaswered as (select d2.client_id, date, branch, response, 'nr' as responder 
+from a1 left join d2 on a1.client_id  = d2.client_id)
+select * from answered UNION ALL select * from nonaswered
+""")
+d3 = d3.dropDuplicates(["client_id"])
+d3.createOrReplaceTempView("d3")
+
+d4 = spark.sql("""
+select
+client_id,
+date_format(from_unixtime(unix_timestamp(date,'yyyyMMdd'),'yyyy-MM-dd'),'yyyy-MM-dd') as dateStudy,
+date_format(date_add(from_unixtime(unix_timestamp(date,'yyyyMMdd'),'yyyy-MM-dd'),-28),'yyyy-MM-dd') as dateStudyM28,
+d30.branch,
+d30.question,
+responder,
+response
+from 
+d3 join d30 
+on d3.branch= d30.branch
+""")
+d4 = d4.cache()
+d4.createOrReplaceTempView("d4")
+spark.sql(""" select responder, count(*),count(distinct(client_id)) from d4 group by 1""").toPandas()
+```
+
+And now left join this data set with main summary in order to get some
+engagement fields. For a strange reason, not all client ids present in the
+survey can be found in `clients_daily` or `main_summary`.
+
+
+```{python eval=FALSE}
+
+ms = spark.read.option("mergeSchema", "true").\
+     parquet("s3://telemetry-parquet/clients_daily/v5")
+ms.createOrReplaceTempView('ms')
+
+result1 = spark.sql("""
+select 
+ms.client_id as cid,
+case when activity_date <= dateStudy and activity_date >=dateStudyM28 then activity_date else NULL end as date,
+dateStudy as dateWhenQuestioned,
+branch,
+question,
+responder,
+response,
+substr(profile_creation_date,1,10)  as pcd,
+datediff(dateStudy,profile_creation_date) as ageAtBeginningofExp,
+os,
+case when  memory_mb < 1800 then '0.(0,1800)' 
+     when      memory_mb <= 2048 then '1.[1800,2048]' 
+     when      memory_mb <= 4096 then '2.(2049,4096)' 
+    else '3.(4096,)' 
+end as mem,
+case when sync_configured = true then 1 when sync_configured = false then 0 else -1 end  as hasSync,
+case when is_default_browser = true then 1 when is_default_browser = false then 0 else -1 end as isDefault,
+coalesce(country,'NA') as country,
+substring(app_version,1,2) as version,
+default_search_engine  as dse,
+active_addons_count_mean as activeaddons,
+coalesce(scalar_parent_browser_engagement_total_uri_count_sum,0) as turi,
+coalesce(scalar_parent_browser_engagement_tab_open_event_count_sum,0) 
+  + coalesce(scalar_parent_browser_engagement_window_open_event_count_sum,0)
+ as ttabwin,
+sessions_started_on_this_day as ns,
+subsession_hours_sum as th,
+active_hours_sum as ah,
+search_count_all_sum as tsrch,
+coalesce(crash_submit_success_main_sum,0) + coalesce(crashes_detected_content_sum,0)
+- coalesce(shutdown_kill_sum,0) + coalesce(crashes_detected_plugin_sum,0) + coalesce(crashes_detected_gmplugin_sum,0)
+ as crash
+from d4   join ms
+on d4.client_id = ms.client_id
+where activity_date >= '2017-09-15' 
+AND   activity_date <= '2017-11-30' 
+AND normalized_channel = 'release'
+AND app_name = 'Firefox'
+having date is not null
+""")
+result1.createOrReplaceTempView('result1')
+result1=result1.cache()
+
+## how many not in our clients_daily?
+
+missing  = spark.sql("""
+with 
+a as (select cid as client_id from result1),
+b as (select client_id from d4  except select client_id from a)
+select d4.* from d4 join b
+on d4.client_id =b.client_id
+""")
+missing.createOrReplaceTempView("missing")
+missing=missing.toPandas()
+
+
+## Aggregate all things over time period
+
+result2=spark.sql("""
+select
+cid,
+sum(ns)                                                 as ns,
+count(*)                                                as ndays,
+mean(activeaddons)                                      as activeAddons,
+stddev_pop(activeaddons)                                as addonsModified,
+sum(ah)                                                 as ah,
+sum(th)                                                 as th,
+sum(tsrch)                                              as tsrch,
+sum(turi)                                               as turi,
+sum(ttabwin)                                            as ttabwin,
+sum(crash)                                              as tcrash,
+min(case when crash>0 then date else '9999-12-31' end)  as dateLastCrashed,
+max(case when crash>0 then 1 else 0 end)                as didCrash
+from result1
+group by 1
+""")
+result2.createOrReplaceTempView('result2')
+result2=result2.cache()
+
+## And for factors that change get the most recent value
+result3 = spark.sql("""
+with a as (select 
+cid,
+os,
+mem,
+hasSync,
+isDefault,
+country,
+version,
+dse,
+dateWhenQuestioned,
+branch,
+question,
+responder,
+response,
+pcd,
+ageAtBeginningofExp,
+row_number() over (partition by cid order by date desc ) as rn 
+from result1)
+select * from a where rn=1
+""")
+result3.createOrReplaceTempView('result3')
+
+## Now merge all
+result4 = spark.sql("""
+select 
+result2.cid,
+dateWhenQuestioned,
+branch,
+question,
+responder,
+response,
+pcd,
+ageAtBeginningofExp,
+os,
+mem,
+hasSync as synq,
+isdefault,
+country,
+version,
+dse,
+ns,
+ndays,
+activeAddons,
+case when addonsModified>0 then 1 else 0 end as  addonsModified,
+ah,
+th,
+tsrch,
+turi,
+ttabwin,
+tcrash,
+case when dateLastCrashed='9999-12-31' then 'NA' else datediff(dateWhenQuestioned,dateLastCrashed)  end as daysSinceLastCrashed,
+didCrash
+from result2 join result3
+on result2.cid = result3.cid
+""")
+result4.createOrReplaceTempView('result4')
+
+import subprocess
+O = "s3://mozilla-metrics/user/sguha/tmp/sentiment"
+subprocess.call(["aws", "s3", "rm", "--recursive", O])
+write = pyspark.sql.DataFrameWriter(result4)
+write.parquet(path=O ,mode='overwrite')
+
+hb  = spark.read.option("mergeSchema", "true").parquet(O)
+hb.createOrReplaceTempView("result4")
+hb.toPandas().to_csv("~/sentiment56.csv",encoding='utf-8')
+missing.to_csv("~/sentiment56_missing.csv",encoding='utf-8')
+subprocess.call(["aws", "s3", "cp", "/home/hadoop/sentiment56.csv",  "s3://mozilla-metrics/user/sguha/tmp/sentiment56.csv"])
+subprocess.call(["aws", "s3", "cp", "/home/hadoop/sentiment56_missing.csv",  "s3://mozilla-metrics/user/sguha/tmp/sentiment56_missing.csv"])
+
+
+```
