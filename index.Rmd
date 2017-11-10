@@ -1,0 +1,49 @@
+--- 
+title:  "Continous Firefox Sentiment Questions "
+author: "Saptarshi Guha <joy@mozilla.com>"
+date: "`r Sys.Date()`"
+knit: "bookdown::render_book"
+biblio-style: apalike
+link-citations: yes
+colorlinks: yes
+lot: yes
+lof: yes
+fontsize: 12pt
+monofont: "Source Code Pro"
+monofontoptions: "Scale=0.7"
+site: bookdown::bookdown_site
+description: "In Firefox 56, we introduced a several questions relating to users perception of Firefox. This survey is asked every day to a different susbet. This report analyses the reponse"
+github-repo: saptarshiguha/fxsentimentSurveys
+---
+
+# Introduction {#intro}
+
+This heartbeat study prompts a random 0.1% of users among this group to answer
+one of several questions. The goal is to ask a different set of users these
+questions on a daily basis. Using these responses, we can gauge the sentiment
+towards Firefox over time ,specifically with every release, compare across
+countries and other metrics.
+
+Some documents of interest
+
+- [Github Repo](https://github.com/gregglind/57-perception-shield-study/blob/master/TELEMETRY.md)
+- [Google Doc describing the covariates for the responses](https://docs.google.com/document/d/1iDH4-_mv4Pr6e_0Wja6fEca08KVfddT-6nBmXuUt9BM/edit)
+
+And a [slack conversation](https://mozilla.slack.com/messages/G7SPQT3EF) that
+captures the questions, which you'll have, regarding the study data set.
+
+Most importantly, the filters used for this study are
+
+- `normandy.locale` in `[‘en-US’, ‘en-AU’, ‘en-CA’, ‘en-GB’, ‘en-NZ’, ‘en-ZA’]`
+- `normandy.version >=  ‘56.0’`
+- `normandy.channel == ‘release’`
+
+As time progresses, we will capture 57 users too. The way a user is chosen is
+via the following snippet
+
+```
+[normandy.userId, normandy.recipeId]|bucketSample((normandy.request_time / (24*60*60*1000)), 1, 1000)
+```
+
+and so we have a 0.1% sample of the above filtered population.
+

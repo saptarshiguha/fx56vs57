@@ -1,0 +1,15 @@
+bookdown::gitbook:
+  dev: png
+  css: css/styles.css
+  config:
+    toc:
+      collapse: none
+      before: |
+        <li><a href="./">Continuous Sentiment Questions for Firefox</a></li>
+      after: |
+        <li><a href="https://mozilla.org" target="_blank">A Mozilla Thing</a></li>
+    edit: https://github.com/saptarshiguha/fxsentimentSurveys/%s
+    sharing: null
+      
+bookdown::html_chapters:
+  css: [css/styles.css, css/toc.css]

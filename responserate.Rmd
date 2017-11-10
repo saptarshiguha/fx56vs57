@@ -1,0 +1,582 @@
+# Studying Response Rate
+
+## Reading the Data
+
+We first read the data into R, remove any missing client_ids (there shouldn't be
+any), convert some of the variables into factors 
+
+```{r readSource,cache=TRUE}
+library(data.table)
+s <- fread("~/tmp/sentiment56.csv")
+s <- s[cid!="",]
+invisible({s[, ":="(
+               mem=factor(mem,ordered=TRUE),
+               tcrash= pmax(tcrash,0),
+               branch=factor(branch,levels=c("satisfied-1","like-1","recommend-1",
+                                             "keep-using-1","up-to-expectations-1",
+                                             "favorite-1")),
+               question=factor(question,levels=c("Are you satisfied with Firefox?",
+                                                 "Do you like Firefox?",
+                                                 "Would you recommend Firefox to a friend or family member?",
+                                                 "Will you keep using Firefox in the future?",
+                                                 "Is Firefox performing up to your expectations?",
+                                                 "Is Firefox is your favorite browser?")),
+               responder=factor(responder,levels=c('nr','r')),
+               response=factor(response, ordered=TRUE),
+               os=factor(os, levels=c('Windows_NT','Darwin','Linux')),
+               synq = factor(synq, ordered=TRUE),
+               isdefault=factor(isdefault, ordered=TRUE),
+               country2=sapply(country, function(s) if( s %in% c("US","IN","GB","ID","CA","AU")) s else "other"),
+               addonsModified=factor(addonsModified))]
+})
+attr (s$mem, "contrasts") <- contr.poly (4) 
+```
+
+## Missing Profiles
+
+Though not visible in the above CSV file, **not all** subjects in the experiment
+could be found in `main-summary` or `clients_daily`. In fact we couldn't find 
+
+```{r nmissing, cache=TRUE}
+nmissing <- fread("~/tmp/sentiment56_missing.csv")[, length(unique(client_id))]
+```
+
+`r nmissing` profiles in our main data sets. *How can this happen?*
+
+
+## Response Rates
+
+Overall response rates and response rates by day
+```{r fig.cap='Response Rate'}
+kable(s[, length(unique(cid)),by=responder])
+```
+
+
+
+
+```{r ResponseRateByDay}
+x <- s[, length(unique(cid)),by=list(dateWhenQuestioned,responder)]
+x <- reshape(x,dir='wide',v.names='V1',timevar='responder',
+             idvar='dateWhenQuestioned')[order(dateWhenQuestioned),]
+setnames(x,c("date","nonresponse","response"))
+invisible(x[, ResponseRate:=response/(response+nonresponse)*100])
+kable(x)
+```
+
+```{r fig.caption="Response Rate by Day"}
+xyplot(ResponseRate~ as.Date(date), type=c('l','g'), scale=list(tick.num=10), lwd=2,xlab='Date When Questioned',
+       ylab='Response Rate',data=x)
+```
+
+## New Profiles
+
+How many profiles were created during the course of the survey? For these
+profiles we won't have their prior 28 day history. We might drop these profiles.
+
+```{r}
+s[, sum(is.na(ageAtBeginningofExp))+sum(!is.na(ageAtBeginningofExp) & ageAtBeginningofExp<=0)]
+```
+
+
+Sample data
+
+```{r, fig.caption='Sample of Data'}
+##datatable(head(s,10),options = list(dom = 't',scrollX = TRUE))
+kable(head(s,10))
+```
+
+## Comparisons between Viewers and Overall Population { #viewerVsWhole}
+Recall in \@ref(intro) we described the  population these profiles are selected
+from. One might argue that only profiles with some minimum usage would be
+selected. Indeed this ought have some truth to it: if you hardly open the
+browser, you might never be selected?
+
+For brevity, we consider profiles asked on a particular day e.g. November
+1st, 2017. And for this day, we look at the distribution of 
+
+- hours/profile
+- active hours/profile
+- pings/ profile
+- uris visited/profile
+- tabs + windows opened/profile
+
+We compute the empirical CDF for the population and apply this to the sample
+values. Then if the sample and population are identically distributed, then the
+average of these values ought be 0.5
+
+
+```{block2,  type='rmdnote'}
+THIS IS YET TO BE DONE, BUT SHOULD BE 
+```
+
+## What Affects Response Rates?
+
+Before we proceed down this path, what 
+
+```{r}
+invisible(s[,i:=1])
+kable(t(xtabs( i ~ responder+question, data=s)))
+```
+and the response rate to each question
+
+```{r}
+x <- data.table(prop.table(t(xtabs( i ~ responder+question, data=s)),1))
+x <- reshape(x,dir='wide',v.names='N',timevar='responder',idvar='question')[order(N.r),]
+kable(x)
+```
+
+What is the likelihood of responding? Is it affected by them using the browser
+more than those that don't? New profiles vs old profiles? Variables we'll
+consider
+
+Keep in mind the questions are assigned randomly to profiles. Hence the
+distribution of the covariates (e.g. distribution of new profiles) will be the
+same across all questions. It wont be the case that we have more of one
+kind in one question vs another *but* a covariate might have different association with
+the response distribution in a question.
+
+For example consider country and the distribution for non responders and responders.
+
+```{r countryExample}
+(s[,prop.table( xtabs(I( responder =='nr') ~ country2))*100])
+(s[,prop.table( xtabs(I( responder =='r') ~ country2))*100])
+```
+
+There is a slight difference (e.g profiles in India are liklier to respond)
+and consquently there is a slight country asymmetry in responders and non
+responders.
+
+We will consider the following covariates
+
+-  **age of profile**, are newer profiles more likely to respond (new is
+   profiles less than 10 days old when they were asked the question)?
+- **os** do profiles on a particular platform more disposed to answering stuff?
+- **total hours**, is a user who uses Firefox more, more likely to respond?
+- **total usage per day*** if they use it more often does it make them more likely
+  to respond  
+- **crash rate (crashes per hour)** 
+- *country*
+
+
+Also we will clean the data of outliers.
+
+```{r quantiles}
+require(DT)
+P <- c(0:9/10,seq(0.95,1,length=21))
+datatable({
+    x <- rbind(data.table(p=P,var='ah',x=s[, quantile(ah,P)])
+              ,data.table(p=P,var='th',x=s[, quantile(th,P)]))
+    reshape(x,dir='wide',v.names='x',timevar='p',idvar='var')
+},options = list(dom = 't',scrollX = TRUE))
+```
+
+Based on the above we'll cap some of the data (rather than drop the rows)
+
+```{r capping1,cache=TRUE}
+logit <- function(p) log(p/(1-p))
+invisible({
+    s2 <- s
+    s2$id <- 1
+    s2[, ":="(ah=pmin(24*29,pmin(ah,quantile(ah,0.999))),
+              th=pmin(24*29,pmin(th,quantile(th,0.999))),
+              turi=pmin(turi,quantile(turi,0.999)),
+              ttabwin=pmin(ttabwin, quantile(ttabwin, 0.999))
+              )]
+    s2 <- s2[,":="(
+        newprofile = ageAtBeginningofExp <=10,
+        ahDay = pmin(24,ah/ndays),
+        thDay = pmin(24,th/ndays),
+        uriDay = turi/ndays,
+        ttabDay=ttabwin/ndays,
+        crate = (   (tcrash+1/60) / (th+1/60)),
+        dcrash=sapply(daysSinceLastCrashed, function(s)if(is.na(s)) 29 else s)
+    )][,]
+    s2 <- s2[,":="(crate = pmin(crate,quantile(crate,0.999)))]
+    s2 <- s2[!is.na(newprofile),]
+})
+```
+
+Consider then a model that examines if any covariate explains differences in
+response rate? Rather than fit one model, we will fit separate models to the
+questions.
+
+In the following code we fit a model to each branch and look at coefficients
+across branches.
+
+
+<!-- ```{r} -->
+<!-- x <- s2[branch=='keep-using-1' ,] -->
+<!-- mbase <- glm( responder ~ 1 , family='binomial' ,  data=x) -->
+<!-- m2 <- glm( responder ~ newprofile + os + country2 -->
+<!--                      + log(1/60+th)+log(crate) -->
+<!--         , family='binomial' ,  data=x) -->
+<!-- binnedplot(predict(m2), resid(m2)) -->
+<!-- doff() -->
+<!-- ## Error Rate (see page 125 of Jennifer Hill) -->
+<!-- ## These two values are soo close, showing the model is rather bad -->
+<!-- ## at predicting who will respond,  -->
+<!-- x$pred <- predict(m2,type='response') -->
+<!-- x[, mean ((predict(mbase,type='response')>0.5 & responder=='nr') | (predict(mbase,type='response')<.5 & responder=='r'))] -->
+<!-- x[, mean (  (pred>0.5 & responder=='nr') | (pred<.5 & responder=='r'))] -->
+<!-- ## The binned residual plot -->
+<!-- ## See same book page 124 -->
+<!-- library(arm) -->
+<!-- binnedplot(predict(m2), resid(m2)) -->
+<!-- ## mean predictive rate -->
+<!-- ## The median th for a profile(same across branches) is -->
+<!-- meth <- s2[,median(th)] -->
+<!-- m60th <- s2[, quantile(th,0.90)] -->
+<!-- ## if a profile only increases hours (same crash rate) -->
+<!-- ## how does predictive probability change? -->
+<!-- lo <- meth -->
+<!-- hi <- m60th -->
+<!-- x2 <- x -->
+<!-- x2$th <- lo -->
+<!-- 0f1 <- predict(m2,newdata=x2,type='response') -->
+<!-- x2 <- x; x2$th <- m60th -->
+<!-- f2 <- predict(m2,newdata=x2,type='response') -->
+<!-- 100*mean(f2-f1,na.rm=TRUE) -->
+<!-- m3 <- bam( responder ~ newprofile + os + country2 -->
+<!--                      + s(th) +s(crate) -->
+<!--                    , family='binomial' ,  data=x) -->
+<!-- pdf("./Rplots.pdf") -->
+<!-- binnedplot(predict(m3), resid(m3)) -->
+<!-- doff() -->
+<!-- ``` -->
+
+
+```{r responseModel, cache=TRUE,dependson='capping'}
+invisible({
+    mb <- s2[,{
+    modelSimp <- glm( responder ~ newprofile + os + country2
+                     + th + uriDay + ttabDay + thDay + crate
+                   , family='binomial' ,  data=.SD)
+    x <- .SD
+    x$ph <- predict(modelSimp,type='response')
+    x2 <- x[,list(ResponseRate=mean(responder=='r'))
+          , by=list(BucketedResponseScore=cut(ph,quantile(ph,0:5/5),include.lowest=TRUE))][order(BucketedResponseScore),]
+    require(InformationValue)
+    prec <- precision(x$responder=='r', x$ph)
+    sens <- sensitivity(x$responder=='r',x$ph)
+    concord <- Concordance(x$responder=='r',x$ph)
+    ##plot <- ks_plot(x$responder=='r',x$ph)
+    list(m=list(modelSimp),r=mean(responder=='r'), orig=list(x),x=list(x2), prec=prec,sens=sens,con=concord$Concordance)
+    },by=branch]
+})
+```
+
+## Model Outputs  By Question
+In the following tabs, i've included the model output and KS Plot that ranks
+profiles predicted probablity to respond, groups them into deciles and plots
+mean actual response rate. In a very predictive model, the graph would rise
+*very* quickly. The diagonal line is the intercept model.
+
+### Is Firefox is your favorite browser?
+
+Summary of model
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+a <- mb[branch=='favorite-1', ]
+summary(a$m[[1]])
+```
+
+Score Ranking
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+kable(a$x)
+print(a$r)
+```
+
+KS Plot
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE,fig.caption="KS Plot"}
+g <- a$orig[[1]]
+ks_plot(g$responder=='r', g$ph)
+```
+
+
+
+### Would you recommend Firefox to a friend or family member?
+
+
+Summary of model
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+a <- mb[branch=='recommend-1', ]
+summary(a$m[[1]])
+```
+
+Score Ranking and Actual Overall Response Rate
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+kable(a$x)
+print(a$r)
+```
+
+KS Plot
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE,fig.caption="KS Plot"}
+g <- a$orig[[1]]
+ks_plot(g$responder=='r', g$ph)
+```
+
+
+### Are you satisfied with Firefox?
+
+
+Summary of model
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+a <- mb[branch=='satisfied-1', ]
+summary(a$m[[1]])
+```
+
+Score Ranking and Actual Overall Response Rate
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+kable(a$x)
+print(a$r)
+```
+
+KS Plot
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+g <- a$orig[[1]]
+ks_plot(g$responder=='r', g$ph)
+```
+
+
+### Do you like Firefox?
+
+Summary of model
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+a <- mb[branch=='like-1', ]
+summary(a$m[[1]])
+```
+
+Score Ranking and Actual Overall Response Rate
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+kable(a$x)
+print(a$r)
+```
+
+KS Plot
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+g <- a$orig[[1]]
+ks_plot(g$responder=='r', g$ph)
+```
+
+
+### Is Firefox performing up to your expectations?
+
+Summary of model
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+a <- mb[branch=='up-to-expectations-1', ]
+summary(a$m[[1]])
+```
+
+Score Ranking and Actual Overall Response Rate
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+kable(a$x)
+print(a$r)
+```
+
+KS Plot
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE,fig.caption='KS Plot'}
+g <- a$orig[[1]]
+ks_plot(g$responder=='r', g$ph)
+```
+
+
+### Will you keep using Firefox in the future?
+
+Summary of model
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+a <- mb[branch=='keep-using-1', ]
+summary(a$m[[1]])
+```
+
+Score Ranking and Actual Overall Response Rate
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE}
+kable(a$x)
+print(a$r)
+```
+
+KS Plot
+
+```{r echo=FALSE,dependson="responseModel",cache=TRUE,fig.caption='KS Plot'}
+g <- a$orig[[1]]
+ks_plot(g$responder=='r', g$ph)
+```
+
+## Coefficient Plots Across Models
+
+I've plotted the coefficients (and their confidence intervals) across the
+branches. 
+
+Rather than plotting coefficients, i've followed Gelmann and Hill's rough
+interpreation of coefficients (see page 91 of Data Analysis and Regression using
+MultiLevel hierarchical  Modelling)
+
+```{r plotCoeff,cache=TRUE,dependson='responseModel'}
+invisible({
+    parms <- c("newprofileTRUE","th","crate","thDay")
+parms2 <- c("newprofile","th","crate","thDay")
+j <- mb[, {
+    coeffs <- coef(m[[1]])[parms]
+    ci <- confint(m[[1]],parms)
+    ci <- data.table(ci); ci$parm=parms
+    x <- data.table(apply(orig[[1]][, parms2, with=FALSE],2,mean,na.rm=TRUE))
+    x2 <- data.table(apply(orig[[1]][, parms2, with=FALSE],2,sd,na.rm=TRUE))
+    ci$mean <- x
+    ci$coef <- coeffs
+    ci$interp <- ci$coef*x2/4*100
+    ci
+    }, by=branch]
+    setnames(j,c("branch","p2.5","p97.5","parm","mean","beta","interp"))
+})
+```
+
+
+```{r coefplot,echo=FALSE,dependson='plotCoeff',fig.cap='Plot of Importance of Coeffiecients Across Questions'}
+
+## dotplot( branch ~ beta | parm, function(x,y,subscripts,...){
+##     panel.dotplot(x,y,...)
+##     d <- j[subscripts,]
+##     for(i in 1:nrow(d)){
+##         f <- d[i,]
+##         panel.lines( c(f$"p2.5",f$"p97.5"),rep(y[i],2),lwd=2)
+##     }
+## },data=j, xlim=list(c(-.02,.02),c(0.05,0.6),c(0,0.002),c(0,0.03)),
+## xlab='Beta', ylab='branch',scale=list(x=list(relation='free')),cex=2)
+
+dotplot( branch ~ interp | parm, function(x,y,subscripts,...){
+    panel.dotplot(x,y,...)
+},data=j,xlab='Percent Change In Predicted Probability to Respond\n when covariate moves 1SD'
+, ylab='branch',scale=list(x=list(relation='free',cex=0.7)),cex=1.5)
+
+```
+
+and the means of the variables
+
+```{r variablemeans,echo=FALSE}
+kable(apply(s2[!is.na(newprofile), parms2, with=FALSE],2,mean,na.rm=TRUE))
+```
+
+## Conclusion
+
+1. We see that across all branches, hours used in the last 28 days is driver of
+   increased of response rate. In the following output, we see the distribution
+   of responders and non responders in different total hour buckets and in the
+   subsequent table, we see the response rate in different buckets
+
+```{r conc1,echo=FALSE,fig.cap='Tables of Responsders, Hours(28 days) and distributions'}
+invisible({
+       s3 <- s2[!is.na(newprofile),];s3$id <- 1
+       s3[, thCut:=cut(th, quantile(th, 0:5/5), include.lowest=TRUE)]
+   })
+s3[, prop.table(xtabs(id ~ thCut+responder),2)*100]
+kable((s3[, list(responseRate = mean(responder=='r'))
+           , by=list(TotalHours=thCut)][order(TotalHours),]))
+#         ,options = list(dom = 't',scrollX = TRUE))
+```
+   
+2. Windows profiles tend to respond less. Below we see the distribution of os
+contrasted between responder and non responder and response rates within os.
+
+```{r conc2,echo=FALSE,fig.cap='Tables of Responders and OS and distributions'}
+s3[, prop.table(xtabs(id ~ os+responder),2)*100]
+kable((s3[, list(responseRate = mean(responder=='r')), by=os]))
+```
+
+
+3. India profiles tend to respond more. Below we see country distribution
+contrasted between responder and non responder.
+
+```{r conc3,echo=FALSE,fig.cap='Table of Responders and Countries and distributions'}
+kable(s3[, prop.table(xtabs(id ~ country2+responder),2)*100])
+kable(s3[, list(responseRate = mean(responder=='r')), by=country2])
+#           ,options = list(dom = 't',scrollX = TRUE))
+```
+
+4. Crash rate is hardly associated with response rate
+
+5. New profiles tend to respond more
+```{r conc4,echo=FALSE, fig.cap='Table of New Profiles and Responder and distributions'}
+kable(s3[, prop.table(xtabs(id ~ newprofile+responder),2)*100])
+kable(s3[, list(responseRate = mean(responder=='r')), by=newprofile])
+#           ,options = list(dom = 't',scrollX = TRUE))
+```
+
+
+In the above, the word 'more' is really only suggestive. These are not strong
+drivers and moreover we see these models (from the KS plot and the following
+table that contains sensitivity, specificity and concordance) are not very good
+(but still better than average) predictors of response. 
+
+```{r conc5,echo=FALSE,dependson='responseModel', fig.cap='Model Quality (poor)'}
+library(knitr)
+kable((mb[, list(branch, meanResponse=r, precision=prec, sensitivity=sens, concordance=con)]))
+#          ,options = list(dom = 't',scrollX = TRUE))
+```
+
+## ToDO
+
+So much more to do. Notes to think about.
+
+0. Compare the people who viewed to population (see \@ref(viewerVsWhole))
+1. These models don't predict responders very well, see sensitivity vs
+   specificity
+2. how do quantify bias? is it a matter of being able to predict who can respond
+   or not respond?
+3. ideally if is specificity and senstivity were both 0, given these covariates
+   we cannot predict who will respond or not
+4. We have seen for some uestions if we bucket predicted scores we can achieve
+   10-15% increase in response rate (albiet, the covariates for these profiles
+   will be very different from  non resoponders)
+5. So does it matter if model is bad? Do we need to improve model? or all that
+   matters we have some rank order and the ks curve is better than straight line
+6. We have seen the responder distribution is different from non responder
+   e.g. see country and new profiles. new profiles tend to respond more and
+   hence we see more of them in the survey. BUT their contribution is still
+   tiny, hence not too dissumualr from the non repsonders. Thus bias is rthere
+   but is it much?
+7. answer the effect of crashers on response.
+
+
+ASK : GIVEN YOU HAD A CRASH, DOES NUMBER OF CRASHES BECOME SIGNIFICANT HINDRANCE
+TO RESPONDING TO SURVEYS?
+
+
+<!-- ```{r ciModelSimple, cache=TRUE,dependson="responseRateModel"} -->
+<!-- library(CIplot)  -->
+<!-- CIplot(modelSimp) -->
+<!-- ``` -->
+
+<!-- ```{r bootLogInterval} -->
+<!-- bi <- function(fml, data, coefName,rep=500,G=exp){ -->
+<!--     require(boot) -->
+<!--     myf <- function(da,i){ -->
+<!--         d <- da[i,] -->
+<!--         uu <- glm( as.formula(fml), family='binomial', data=d) -->
+<!--        G(coef(uu)[coefName]) -->
+<!--     } -->
+<!--     b <- boot(data, myf, R=rep) -->
+<!--     boot.ci(b, type='norm')$normal[-1] -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ```{r confCoeefModel1,cache=TRUE} -->
+<!-- fml <- responder ~ (newprofile + os + log(th+1)+log(thDay+1 ) + didCrash) -->
+<!-- newprofile <- bi(fml=fml, data=s2, coefName='newprofileTRUE',rep=100) -->
+<!-- thday <- bi(fml=fml, data=s2, coefName='log(thDay + 1)', -->
+<!--             rep=100,G=function(x) x) -->
+<!-- ``` -->

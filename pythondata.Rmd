@@ -1,11 +1,12 @@
+# Extracting Data Using PySpark
 
-```{python eval=FALSE, code_folding='hide'}
+Filter on dates
+```{python foo,eval=FALSE}
 import sys
 import datetime
 import random
 import subprocess
 import mozillametricstools.common.functions as mozfun
-
 from pyspark.sql import SparkSession
 spark = SparkSession.builder.getOrCreate()
 ts = spark.read.option("mergeSchema", "true").\
@@ -21,8 +22,11 @@ WHERE payload.testing = FALSE
   and submission <='20171113'
 """)
 d0.createOrReplaceTempView("d0")
+```
 
+Extract variables of interest
 
+```{python eval=FALSE}
 d=spark.sql("""
 SELECT 
 client_id,
@@ -38,7 +42,14 @@ order by client_id
 d.createOrReplaceTempView("d")
 ```
 
-Remove profiles with 2+ responses. 
+Remove profiles with 2+ responses. Though a count is not provided, this number
+is not many. Most importantly during a given time period,we don't want the same
+person answering twice. The way the survey is implemented, the same person will be
+prompted twice *eventually* but quite far in time. 
+
+```{block2,  type='rmdnote'}
+Ask mgrimes when exactly is profile asked again
+```
 
 ```{python eval=FALSE}
 spark.sql("""
@@ -58,7 +69,8 @@ select branch,question,count(*) as n  from d2 where event='answered' group by 1,
 d30.createOrReplaceTempView("d30")
 
 ```
-And now convert the data set into one row per client tagged as a responder or
+
+convert the data set into one row per client tagged as a responder or
 non responder.
 
 ```{python eval=FALSE}
@@ -96,7 +108,7 @@ d4.createOrReplaceTempView("d4")
 spark.sql(""" select responder, count(*),count(distinct(client_id)) from d4 group by 1""").toPandas()
 ```
 
-And now left join this data set with main summary in order to get some
+Left join this data set with main summary in order to get some
 engagement fields. For a strange reason, not all client ids present in the
 survey can be found in `clients_daily` or `main_summary`.
 
@@ -151,9 +163,11 @@ having date is not null
 """)
 result1.createOrReplaceTempView('result1')
 result1=result1.cache()
+```
 
-## how many not in our clients_daily?
+how many not in our clients_daily?
 
+```{python eval=FALSE}
 missing  = spark.sql("""
 with 
 a as (select cid as client_id from result1),
@@ -163,10 +177,12 @@ on d4.client_id =b.client_id
 """)
 missing.createOrReplaceTempView("missing")
 missing=missing.toPandas()
+```
 
 
-## Aggregate all things over time period
+aggregate all things over time period
 
+```{python eval=FALSE}
 result2=spark.sql("""
 select
 cid,
@@ -187,8 +203,10 @@ group by 1
 """)
 result2.createOrReplaceTempView('result2')
 result2=result2.cache()
+```
+ And for factors that change get the most recent value
 
-## And for factors that change get the most recent value
+```{python eval=FALSE}
 result3 = spark.sql("""
 with a as (select 
 cid,
@@ -211,8 +229,11 @@ from result1)
 select * from a where rn=1
 """)
 result3.createOrReplaceTempView('result3')
+```
 
-## Now merge all
+now merge all
+
+```{python eval=FALSE}
 result4 = spark.sql("""
 select 
 result2.cid,
@@ -246,7 +267,11 @@ from result2 join result3
 on result2.cid = result3.cid
 """)
 result4.createOrReplaceTempView('result4')
+```
 
+and save
+
+```{python eval=FALSE}
 import subprocess
 O = "s3://mozilla-metrics/user/sguha/tmp/sentiment"
 subprocess.call(["aws", "s3", "rm", "--recursive", O])
@@ -259,6 +284,4 @@ hb.toPandas().to_csv("~/sentiment56.csv",encoding='utf-8')
 missing.to_csv("~/sentiment56_missing.csv",encoding='utf-8')
 subprocess.call(["aws", "s3", "cp", "/home/hadoop/sentiment56.csv",  "s3://mozilla-metrics/user/sguha/tmp/sentiment56.csv"])
 subprocess.call(["aws", "s3", "cp", "/home/hadoop/sentiment56_missing.csv",  "s3://mozilla-metrics/user/sguha/tmp/sentiment56_missing.csv"])
-
-
 ```
