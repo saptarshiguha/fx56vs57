@@ -1,0 +1,26 @@
+# Question Responses
+
+```{r respInit,echo=FALSE,cache=TRUE}
+coding <- c("No","Maybe","Yes")
+s4 <- s
+s4$newprofile <- s$ageAtBeginningofExp <=10
+s4 <- s4[!is.na(newprofile),]
+s4 <- s4[response>-2,][, response:=factor(response,levels=c(-1,0,1),labels=c("No","Maybe","Yes"))]
+s4$id <- 1
+```
+
+In this section, we'll first lead with the response distribution for the
+different questions and then study any relationships between response
+distributions and covariates.
+
+```{r respDist,dependson='respInit'}
+r <- s4[,prop.table(table(question,response),1)*100]
+kable(r[order(r[,'Yes']),],
+      caption='Responses to Questions'
+    , table.attr = "style='width:100%;'")
+
+```
+
+It's interesting how the questions' *Yes* responses arrange themselves into 3
+groups: the first on its own, the second two with similar *Yes* percents around
+48 and the last three with positive responses in the low 60s.
