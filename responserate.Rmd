@@ -32,7 +32,7 @@ invisible({s[, ":="(
 attr (s$mem, "contrasts") <- contr.poly (4) 
 ```
 
-## Missing Profiles
+## Missing Profiles { #missingprofiles }
 
 Though not visible in the above CSV file, **not all** subjects in the experiment
 could be found in `main-summary` or `clients_daily`. In fact we couldn't find 
@@ -550,6 +550,7 @@ So much more to do. Notes to think about.
    tiny, hence not too dissumualr from the non repsonders. Thus bias is rthere
    but is it much?
 7. answer the effect of crashers on response.
+8. investigate missing profiles (see \@ref(missingprofiles))
 
 
 ASK : GIVEN YOU HAD A CRASH, DOES NUMBER OF CRASHES BECOME SIGNIFICANT HINDRANCE

@@ -2,8 +2,9 @@ bookdown::gitbook:
   dev: png
   css: css/styles.css
   config:
-    toc:
-      collapse: none
+    toc:        
+      collapse: subsection
+      scroll_highlight: yes 
       before: |
         <li><a href="./">Continuous Sentiment Questions for Firefox</a></li>
       after: |
