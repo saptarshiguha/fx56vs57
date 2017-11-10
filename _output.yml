@@ -8,7 +8,7 @@ bookdown::gitbook:
         <li><a href="./">Continuous Sentiment Questions for Firefox</a></li>
       after: |
         <li><a href="https://mozilla.org" target="_blank">A Mozilla Thing</a></li>
-    edit: https://github.com/saptarshiguha/fxsentimentSurveys/%s
+    edit: https://github.com/saptarshiguha/fxsentimentSurveys/blob/master/%s
     sharing: null
       
 bookdown::html_chapters:
