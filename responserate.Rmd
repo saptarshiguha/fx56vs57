@@ -48,22 +48,23 @@ nmissing <- fread("~/tmp/sentiment56_missing.csv")[, length(unique(client_id))]
 
 Overall response rates and response rates by day
 ```{r fig.cap='Response Rate'}
-kable(s[, length(unique(cid)),by=responder])
+kable_styling(kable(s[, length(unique(cid)),by=responder],caption='Response Rate',format='html')
+           ,full_width=FALSE,position='left')
 ```
 
 
 
 
-```{r ResponseRateByDay}
+```{r ResponseRateByDay,echo=FALSE}
 x <- s[, length(unique(cid)),by=list(dateWhenQuestioned,responder)]
 x <- reshape(x,dir='wide',v.names='V1',timevar='responder',
              idvar='dateWhenQuestioned')[order(dateWhenQuestioned),]
 setnames(x,c("date","nonresponse","response"))
 invisible(x[, ResponseRate:=response/(response+nonresponse)*100])
-kable(x)
+##kable(x,format='html', caption='Response Rate By Day')
 ```
 
-```{r fig.caption="Response Rate by Day"}
+```{r RespRateDayPlot, fig.caption="Response Rate by Day"}
 xyplot(ResponseRate~ as.Date(date), type=c('l','g'), scale=list(tick.num=10), lwd=2,xlab='Date When Questioned',
        ylab='Response Rate',data=x)
 ```
@@ -80,9 +81,11 @@ s[, sum(is.na(ageAtBeginningofExp))+sum(!is.na(ageAtBeginningofExp) & ageAtBegin
 
 Sample data
 
-```{r, fig.caption='Sample of Data'}
-##datatable(head(s,10),options = list(dom = 't',scrollX = TRUE))
-kable(head(s,10))
+```{r, echo=FALSE}
+datatable(head(s,10), options = list(dom = 't',scrollX = TRUE))
+##kable_styling(kable(head(s,10),format='html',caption='Sample Data')
+##             ,bootstrap_options = c('striped',"condensed","responsive")
+##             ,full_width=FALSE,position='left')
 ```
 
 ## Comparisons between Viewers and Overall Population { #viewerVsWhole}
@@ -412,7 +415,7 @@ print(a$r)
 
 KS Plot
 
-```{r echo=FALSE,dependson="responseModel",cache=TRUE,fig.caption='KS Plot'}
+```{r KeepPlot,echo=FALSE,dependson="responseModel",cache=TRUE,fig.caption='KS Plot'}
 g <- a$orig[[1]]
 ks_plot(g$responder=='r', g$ph)
 ```
@@ -447,28 +450,17 @@ j <- mb[, {
 
 
 ```{r coefplot,echo=FALSE,dependson='plotCoeff',fig.cap='Plot of Importance of Coeffiecients Across Questions'}
-
-## dotplot( branch ~ beta | parm, function(x,y,subscripts,...){
-##     panel.dotplot(x,y,...)
-##     d <- j[subscripts,]
-##     for(i in 1:nrow(d)){
-##         f <- d[i,]
-##         panel.lines( c(f$"p2.5",f$"p97.5"),rep(y[i],2),lwd=2)
-##     }
-## },data=j, xlim=list(c(-.02,.02),c(0.05,0.6),c(0,0.002),c(0,0.03)),
-## xlab='Beta', ylab='branch',scale=list(x=list(relation='free')),cex=2)
-
 dotplot( branch ~ interp | parm, function(x,y,subscripts,...){
     panel.dotplot(x,y,...)
 },data=j,xlab='Percent Change In Predicted Probability to Respond\n when covariate moves 1SD'
 , ylab='branch',scale=list(x=list(relation='free',cex=0.7)),cex=1.5)
-
 ```
 
 and the means of the variables
 
 ```{r variablemeans,echo=FALSE}
-kable(apply(s2[!is.na(newprofile), parms2, with=FALSE],2,mean,na.rm=TRUE))
+kable_styling(kable(apply(s2[!is.na(newprofile), parms2, with=FALSE],2,mean,na.rm=TRUE)
+             ,format='html'),full_width=FALSE,position='center',bootstrap_options='condensed')
 ```
 
 ## Conclusion
@@ -478,41 +470,51 @@ kable(apply(s2[!is.na(newprofile), parms2, with=FALSE],2,mean,na.rm=TRUE))
    of responders and non responders in different total hour buckets and in the
    subsequent table, we see the response rate in different buckets
 
-```{r conc1,echo=FALSE,fig.cap='Tables of Responsders, Hours(28 days) and distributions'}
+```{r conc1,echo=FALSE}
 invisible({
        s3 <- s2[!is.na(newprofile),];s3$id <- 1
        s3[, thCut:=cut(th, quantile(th, 0:5/5), include.lowest=TRUE)]
    })
-s3[, prop.table(xtabs(id ~ thCut+responder),2)*100]
-kable((s3[, list(responseRate = mean(responder=='r'))
-           , by=list(TotalHours=thCut)][order(TotalHours),]))
-#         ,options = list(dom = 't',scrollX = TRUE))
+x <- s3[, prop.table(xtabs(id ~ thCut+responder),2)*100]
+y <- s3[, list(responseRate = mean(responder=='r'))
+           , by=list(TotalHours=thCut)][order(TotalHours),]
+##         ,options = list(dom = 't',scrollX = TRUE))
+g <- kable(list(x,y),format='html', caption='Cond. Dist Given Responder and Hours')
+kable_styling(g,full_width=FALSE,position='center', bootstrap_options='condensed')
 ```
    
 2. Windows profiles tend to respond less. Below we see the distribution of os
 contrasted between responder and non responder and response rates within os.
 
-```{r conc2,echo=FALSE,fig.cap='Tables of Responders and OS and distributions'}
-s3[, prop.table(xtabs(id ~ os+responder),2)*100]
-kable((s3[, list(responseRate = mean(responder=='r')), by=os]))
+```{r conc2,echo=FALSE}
+x <- s3[, prop.table(xtabs(id ~ os+responder),2)*100]
+y <- s3[, list(responseRate = mean(responder=='r')), by=os]
+g <- kable(list(x,y), format='html', caption=c("Cond. Dist Given Responder and OS"))
+kable_styling(g, full_width=FALSE,position='center',bootstrap_options='condensed')
 ```
 
 
 3. India profiles tend to respond more. Below we see country distribution
 contrasted between responder and non responder.
 
-```{r conc3,echo=FALSE,fig.cap='Table of Responders and Countries and distributions'}
-kable(s3[, prop.table(xtabs(id ~ country2+responder),2)*100])
-kable(s3[, list(responseRate = mean(responder=='r')), by=country2])
-#           ,options = list(dom = 't',scrollX = TRUE))
+```{r conc3,echo=FALSE}
+g=kable(list(s3[, prop.table(xtabs(id ~ country2+responder),2)*100],
+             s3[, list(responseRate = mean(responder=='r')), by=country2]
+             ),format='html',caption=c("Cond. Dist Given Responder and Country"))
+kable_styling(g, full_width=FALSE, position='center', bootstrap_options=c('condensed'))
 ```
 
 4. Crash rate is hardly associated with response rate
 
 5. New profiles tend to respond more
-```{r conc4,echo=FALSE, fig.cap='Table of New Profiles and Responder and distributions'}
-kable(s3[, prop.table(xtabs(id ~ newprofile+responder),2)*100])
-kable(s3[, list(responseRate = mean(responder=='r')), by=newprofile])
+
+```{r conc4,echo=FALSE}
+x <- s3[, prop.table(xtabs(id ~ newprofile+responder),2)*100]
+y <- s3[, list(responseRate = mean(responder=='r')), by=newprofile]
+kable_styling(
+    kable(list(x,y),caption='Conditional Distributions Given Responder and New Profile'
+          ,format='html')
+    ,full_width=FALSE,position='center', bootstrap_options=c('condensed'))
 #           ,options = list(dom = 't',scrollX = TRUE))
 ```
 
@@ -522,8 +524,7 @@ drivers and moreover we see these models (from the KS plot and the following
 table that contains sensitivity, specificity and concordance) are not very good
 (but still better than average) predictors of response. 
 
-```{r conc5,echo=FALSE,dependson='responseModel', fig.cap='Model Quality (poor)'}
-library(knitr)
+```{r conc5,cache=TRUE,echo=FALSE,dependson='responseModel', fig.cap='Model Quality (poor)'}
 kable((mb[, list(branch, meanResponse=r, precision=prec, sensitivity=sens, concordance=con)]))
 #          ,options = list(dom = 't',scrollX = TRUE))
 ```

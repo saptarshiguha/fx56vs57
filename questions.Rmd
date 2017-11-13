@@ -24,3 +24,180 @@ kable(r[order(r[,'Yes']),],
 It's interesting how the questions' *Yes* responses arrange themselves into 3
 groups: the first on its own, the second two with similar *Yes* percents around
 48 and the last three with positive responses in the low 60s.
+
+## Questions and Categorical Covariates
+
+In this section, I've plotted some bar charts describing the response
+distribution by several categorical covariates. 
+
+### Marginal Distributions of Covariates
+
+```{r marg, cache=TRUE,fig.caption='Margin Distributions of Covariates'}
+s4$dse2 <- factor(sapply(s4$dse,function(k){
+    if(k %in% c("google","google-nocodes","yahoo")) k else "rest"
+     }), levels=c("google","google-nocodes","yahoo","rest"))
+j <- rbindlist(lapply(c("os","country2","mem","isdefault","synq","newprofile","dse2"),function(v){
+    s4[,.N,by=get(v)][,":="(covariate=v,p=N/sum(N)*100,N=NULL)][,]
+}))
+
+barchart(get ~ p|covariate, scale='free',data=j,layout=c(2,4),cex=0.5,box.ratio=2
+        ,par.strip.text=list(cex=0.5))
+
+```
+       
+
+
+```{r prepPlot, cache=TRUE,echo=FALSE}
+library(lattice)
+
+ foo1 <- function(x0){
+    x10 <- x0[,{
+        x <- table(response);
+        data.table(percent=x/sum(x)*100)}
+      , by=os][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
+    x1 <- x0[,{
+        x <- table(response);
+        data.table(percent=x/sum(x)*100)}
+      , by=country2][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
+    x2 <- x0[,{
+        x <- table(response);
+        data.table(percent=x/sum(x)*100)}
+      , by=mem][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
+    x3 <- x0[,{
+        x <- table(response);
+        data.table(percent=x/sum(x)*100)}
+      , by=isdefault][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
+    x4 <- x0[,{
+        x <- table(response);
+        data.table(percent=x/sum(x)*100)}
+      , by=synq][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
+    x5 <- x0[,{
+        x <- table(response);
+        data.table(percent=x/sum(x)*100)}
+      , by=list(newprofile=factor(newprofile))][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
+     x6 <- x0[,{
+        x <- table(response);
+        data.table(percent=x/sum(x)*100)}
+      , by=list(dse2)][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
+     u10 <- barchart(percent.N~os,data=x10,groups=percent.response,auto.key=list(columns=3))
+     u1 <- barchart(percent.N~country2,data=x1,groups=percent.response,xlab='Country')
+     u2 <- barchart(percent.N~mem,data=x2,groups=percent.response,xlab='Memory')
+     u3 <- barchart(percent.N~isdefault,data=x3,groups=percent.response,xlab='Default Status',auto.key=list(columns=3))
+     u4 <- barchart(percent.N~synq,data=x4,groups=percent.response,xlab='Sync Status')
+     u5 <- barchart(percent.N~newprofile,data=x5,groups=percent.response,xlab='New profile status (<10 Days Old)')
+     u6 <- barchart(percent.N~dse2,data=x6,groups=percent.response,xlab='Default Search Engine')
+    list(u10=u10,u1=u1,u2=u2,u3=u3,u4=u4,u5=u5,u6=u6,
+         x10=x10,x1=x1,x2=x2,x3=x3,x4=x4,x5=x5,x6=x6)
+ }
+
+```
+
+
+### Would you recommend Firefox to a friend or family member?
+
+```{r q1plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
+x0 <- s4[branch=='recommend-1',]
+x0r <- foo1(x0)
+```
+
+```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q1plot'}
+print(x0r$u10)
+print(x0r$u1)
+print(x0r$u2)
+print(x0r$u3)
+print(x0r$u4)
+print(x0r$u5)
+print(x0r$u6)
+```
+
+The results might raise an eyebrow or two. I'll point out that profiles in IN,ID
+and Other are skewed towards lower memory and this contributes the prevalence of
+*No* (despite that ID is very strongly *No*!)
+
+```{r cache=TRUE}
+kable(s4[, round(prop.table(xtabs(id ~ mem+country2),2)*100,3)])
+```
+
+### Is Firefox performing up to your expectations?
+
+```{r q2plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
+x0 <- s4[branch=='up-to-expectations-1',]
+x1r <- foo1(x0)
+```
+
+```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q2plot'}
+print(x1r$u10)
+print(x1r$u1)
+print(x1r$u2)
+print(x1r$u3)
+print(x1r$u4)
+print(x1r$u5)
+print(x1r$u6)
+```
+
+### Is Firefox is your favorite browser?
+```{r q3plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
+x0 <- s4[branch=='favorite-1',]
+x2r <- foo1(x0)
+```
+
+```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q2plot'}
+print(x2r$u10)
+print(x2r$u1)
+print(x2r$u2)
+print(x2r$u3)
+print(x2r$u4)
+print(x2r$u5)
+print(x2r$u6)
+```
+
+### Are you satisfied with Firefox?
+
+```{r q4plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
+x0 <- s4[branch=='satisfied-1',]
+x3r <- foo1(x0)
+```
+
+```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q3plot'}
+print(x3r$u10)
+print(x3r$u1)
+print(x3r$u2)
+print(x3r$u3)
+print(x3r$u4)
+print(x3r$u5)
+print(x2r$u6)
+```
+
+
+### Do you like Firefox?
+```{r q5plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
+x0 <- s4[branch=='like-1',]
+x4r <- foo1(x0)
+```
+
+```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q4plot'}
+print(x4r$u10)
+print(x4r$u1)
+print(x4r$u2)
+print(x4r$u3)
+print(x4r$u4)
+print(x4r$u5)
+print(x2r$u6)
+```
+
+### Will you keep using Firefox in the future?
+```{r q6plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
+x0 <- s4[branch=='keep-using-1',]
+x5r <- foo1(x0)
+```
+
+```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q5plot'}
+print(x5r$u10)
+print(x5r$u1)
+print(x5r$u2)
+print(x5r$u3)
+print(x5r$u4)
+print(x5r$u5)
+print(x2r$u6)
+```
+
