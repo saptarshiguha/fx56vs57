@@ -1,5 +1,17 @@
 # Question Responses
 
+```{r include=FALSE}
+myCustomOpts <- function(zz,skip=NULL){
+    zz$x$options$dom <- 't'
+    zz$x$options$pageLength <- -1
+    zz$x$options$scrollX <- "TRUE"
+    if(!is.null(skip)){
+        zz$x$options$columnDefs = list(list(visible=FALSE,targets =skip))
+    }
+    zz
+}
+```
+
 ```{r respInit,echo=FALSE,cache=TRUE}
 coding <- c("No","Maybe","Yes")
 s4 <- s
@@ -49,7 +61,6 @@ barchart(get ~ p|covariate, scale='free',data=j,layout=c(2,4),cex=0.5,box.ratio=
 
 ```{r prepPlot, cache=TRUE,echo=FALSE}
 library(lattice)
-
  foo1 <- function(x0){
     x10 <- x0[,{
         x <- table(response);
@@ -71,7 +82,7 @@ library(lattice)
         x <- table(response);
         data.table(percent=x/sum(x)*100)}
       , by=synq][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
-    x5 <- x0[,{
+    x5 <- x0[,{ 
         x <- table(response);
         data.table(percent=x/sum(x)*100)}
       , by=list(newprofile=factor(newprofile))][,percent.response:=factor(percent.response,levels=c("No","Maybe","Yes"))][,]
@@ -110,13 +121,23 @@ print(x0r$u5)
 print(x0r$u6)
 ```
 
-The results might raise an eyebrow or two. I'll point out that profiles in IN,ID
-and Other are skewed towards lower memory and this contributes the prevalence of
-*No* (despite that ID is very strongly *No*!)
+The results might raise an eyebrow or two. Though ID computers tend to have less memory
 
 ```{r cache=TRUE}
 kable(s4[, round(prop.table(xtabs(id ~ mem+country2),2)*100,3)])
 ```
+
+this resounding *No!* is present across all memory sizes! See the following
+table
+
+- we have small sample sizes (increase sample!)
+- ID, IN and Others say *No* across all memory amounts but ID profiles declare this is with more emphasis.
+
+```{r echo=FALSE}
+f <- x0[, list(.N,round(100*mean(response=="No"),3)),by=list(mem,country2)][order(mem,country2),]
+myCustomOpts(datatable(f))
+```
+
 
 ### Is Firefox performing up to your expectations?
 
