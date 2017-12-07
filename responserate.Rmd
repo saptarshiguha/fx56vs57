@@ -7,7 +7,7 @@ any), convert some of the variables into factors
 
 ```{r readSource,cache=TRUE}
 library(data.table)
-s <- fread("~/tmp/sentiment56.csv")
+s <- fread("~/tmp/sentiment57.csv")
 s <- s[cid!="",]
 invisible({s[, ":="(
                mem=factor(mem,ordered=TRUE),
@@ -38,7 +38,7 @@ Though not visible in the above CSV file, **not all** subjects in the experiment
 could be found in `main-summary` or `clients_daily`. In fact we couldn't find 
 
 ```{r nmissing, cache=TRUE}
-nmissing <- fread("~/tmp/sentiment56_missing.csv")[, length(unique(client_id))]
+nmissing <- fread("~/tmp/sentiment57_missing.csv")[, length(unique(client_id))]
 ```
 
 `r nmissing` profiles in our main data sets. *How can this happen?*
