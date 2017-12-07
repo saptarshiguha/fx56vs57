@@ -20,6 +20,7 @@ WHERE payload.testing = FALSE
   AND payload.study_name = '57-perception-shield-study'
   AND submission  >= '20171101'
   and submission <='20171225'
+and substr(application.version,1,2)='57'
 """)
 d0.createOrReplaceTempView("d0")
 ```
@@ -277,5 +278,6 @@ hb.createOrReplaceTempView("result4")
 hb.toPandas().to_csv("~/sentiment57.csv",encoding='utf-8')
 missing.to_csv("~/sentiment57_missing.csv",encoding='utf-8')
 subprocess.call(["aws", "s3", "cp", "/home/hadoop/sentiment57.csv",  "s3://mozilla-metrics/user/sguha/tmp/sentiment57.csv"])
-subprocess.call(["aws", "s3", "cp", "/home/hadoop/sentiment57_missing.csv",  "s3://mozilla-metrics/user/sguha/tmp/sentiment57_missing.csv"])
+subprocess.call(["aws", "s3", "cp", "/home/hadoop/sentiment57_missing.csv",  "s3://mozilla-metrics/user/sguha/tmp/sentiment57
+_missing.csv"])
 ```
