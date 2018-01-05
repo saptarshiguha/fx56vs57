@@ -1,5 +1,5 @@
 --- 
-title:  "Continous Firefox Sentiment Questions "
+title:  "Continous Firefox Sentiment Questions  "
 author: "Saptarshi Guha <joy@mozilla.com>"
 date: "`r Sys.Date()`"
 knit: "bookdown::render_book"
@@ -15,6 +15,17 @@ site: bookdown::bookdown_site
 description: "In Firefox 56, we introduced a several questions relating to users perception of Firefox. This survey is asked every day to a different susbet. This report analyses the reponse"
 github-repo: saptarshiguha/fxsentimentSurveys
 ---
+
+```{r global_options, include=FALSE}
+options(width=1000)
+library(DT)
+library(formattable)
+knitr::opts_chunk$set(
+ fig.width=10, fig.align='center',
+ echo=TRUE, cache.lazy=FALSE,
+ warning=FALSE, message=FALSE
+ )
+```
 
 # Introduction {#intro}
 

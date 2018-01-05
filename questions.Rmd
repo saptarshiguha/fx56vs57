@@ -51,8 +51,8 @@ s4$dse2 <- factor(sapply(s4$dse,function(k){
 j <- rbindlist(lapply(c("os","country2","mem","isdefault","synq","newprofile","dse2"),function(v){
     s4[,.N,by=get(v)][,":="(covariate=v,p=N/sum(N)*100,N=NULL)][,]
 }))
-
-barchart(get ~ p|covariate, scale='free',data=j,layout=c(2,4),cex=0.5,box.ratio=2
+ 
+barchart (get ~ p|covariate, scale='free',data=j,layout=c(2,4),cex=0.5,box.ratio=2
         ,par.strip.text=list(cex=0.5))
 
 ```
@@ -98,7 +98,7 @@ library(lattice)
      u5 <- barchart(percent.N~newprofile,data=x5,groups=percent.response,xlab='New profile status (<10 Days Old)')
      u6 <- barchart(percent.N~dse2,data=x6,groups=percent.response,xlab='Default Search Engine')
     list(u10=u10,u1=u1,u2=u2,u3=u3,u4=u4,u5=u5,u6=u6,
-         x10=x10,x1=x1,x2=x2,x3=x3,x4=x4,x5=x5,x6=x6)
+          x10=x10,x1=x1,x2=x2,x3=x3,x4=x4,x5=x5,x6=x6)
  }
 
 ```
@@ -107,12 +107,12 @@ library(lattice)
 ### Would you recommend Firefox to a friend or family member?
 
 ```{r q1plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
-x0 <- s4[branch=='recommend-1',]
-x0r <- foo1(x0)
+x0 <- s4 [branch=='recommend-1',]
+x0r <- foo1(x0 )
 ```
 
 ```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q1plot'}
-print(x0r$u10)
+print(x0r$u10 )
 print(x0r$u1)
 print(x0r$u2)
 print(x0r$u3)
@@ -143,12 +143,12 @@ myCustomOpts(datatable(f))
 
 ```{r q2plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
 x0 <- s4[branch=='up-to-expectations-1',]
-x1r <- foo1(x0)
+x1r <- foo1(x0 )
 ```
 
 ```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q2plot'}
-print(x1r$u10)
-print(x1r$u1)
+print( x1r$u10)
+print(x1r$u1 )
 print(x1r$u2)
 print(x1r$u3)
 print(x1r$u4)
@@ -176,13 +176,13 @@ print(x2r$u6)
 
 ```{r q4plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
 x0 <- s4[branch=='satisfied-1',]
-x3r <- foo1(x0)
+x3r <- foo1( x0)
 ```
 
 ```{r  echo=FALSE,cache=TRUE,out.width='50%',fig.show='hold', fig.caption='Conditional Response Distributions',dependson='q3plot'}
 print(x3r$u10)
 print(x3r$u1)
-print(x3r$u2)
+print(x3r$u2 )
 print(x3r$u3)
 print(x3r$u4)
 print(x3r$u5)
@@ -192,7 +192,7 @@ print(x2r$u6)
 
 ### Do you like Firefox?
 ```{r q5plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
-x0 <- s4[branch=='like-1',]
+x0 <- s4[branch=='like-1' ,]
 x4r <- foo1(x0)
 ```
 
@@ -202,13 +202,13 @@ print(x4r$u1)
 print(x4r$u2)
 print(x4r$u3)
 print(x4r$u4)
-print(x4r$u5)
+print(x4r$u5 )
 print(x2r$u6)
 ```
 
 ### Will you keep using Firefox in the future?
 ```{r q6plot,echo=FALSE,dependson='prepPlot',cache=TRUE}
-x0 <- s4[branch=='keep-using-1',]
+x0 <- s4[branch=='keep-using-1' ,]
 x5r <- foo1(x0)
 ```
 
@@ -218,7 +218,7 @@ print(x5r$u1)
 print(x5r$u2)
 print(x5r$u3)
 print(x5r$u4)
-print(x5r$u5)
+print(x5r$u5 )
 print(x2r$u6)
 ```
 

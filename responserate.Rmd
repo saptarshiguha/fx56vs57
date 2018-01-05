@@ -5,8 +5,17 @@
 We first read the data into R, remove any missing client_ids (there shouldn't be
 any), convert some of the variables into factors 
 
-```{r readSource,cache=TRUE}
+```{r include=FALSE}
 library(data.table)
+library(knitr)
+library(kableExtra)
+library(DT)
+library(lattice)
+```
+
+```{r readSource,cache=TRUE}
+system("aws s3 cp s3://mozilla-metrics/user/sguha/tmp/sentiment57.csv ~/tmp/")
+system("aws s3 cp s3://mozilla-metrics/user/sguha/tmp/sentiment57_missing.csv  ~/tmp/")
 s <- fread("~/tmp/sentiment57.csv")
 s <- s[cid!="",]
 invisible({s[, ":="(
@@ -248,7 +257,9 @@ across branches.
 <!-- ``` -->
 
 
+
 ```{r responseModel, cache=TRUE,dependson='capping'}
+
 invisible({
     mb <- s2[,{
     modelSimp <- glm( responder ~ newprofile + os + country2
@@ -258,16 +269,20 @@ invisible({
     x$ph <- predict(modelSimp,type='response')
     x2 <- x[,list(ResponseRate=mean(responder=='r'))
           , by=list(BucketedResponseScore=cut(ph,quantile(ph,0:5/5),include.lowest=TRUE))][order(BucketedResponseScore),]
-    require(InformationValue)
-    prec <- precision(x$responder=='r', x$ph)
-    sens <- sensitivity(x$responder=='r',x$ph)
-    concord <- Concordance(x$responder=='r',x$ph)
+##    require(InformationValue)
+##    prec <- precision(x$responder=='r', x$ph)
+    ##    sens <- sensitivity(x$responder=='r',x$ph)
+    ##   concord <- Concordance(x$responder=='r',x$ph)$Concordance
+    prec=1;sens <- 1;concord <- NA
     ##plot <- ks_plot(x$responder=='r',x$ph)
-    list(m=list(modelSimp),r=mean(responder=='r'), orig=list(x),x=list(x2), prec=prec,sens=sens,con=concord$Concordance)
+    list(m=list(modelSimp),r=mean(responder=='r'), orig=list(x),x=list(x2), prec=prec,sens=sens,con=concord)
     },by=branch]
 })
 ```
 
+```{r include=FALSE}
+require(InformationValue)
+```
 ## Model Outputs  By Question
 In the following tabs, i've included the model output and KS Plot that ranks
 profiles predicted probablity to respond, groups them into deciles and plots
